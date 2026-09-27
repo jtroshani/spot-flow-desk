@@ -25,6 +25,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap">
+<script>
+  // Apply a saved theme before first paint so the page never flashes the wrong one.
+  try { const t = localStorage.getItem("sfd-theme"); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 <style>
 :root {
   color-scheme: light;
@@ -127,6 +131,11 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--focus)
 .refresh:hover { color: var(--ink); }
 .refresh svg { width: 13px; height: 13px; }
 .refresh.spin svg { animation: rot .8s linear infinite; }
+.theme-btn { padding: 5px 8px; }
+.theme-btn svg { width: 14px; height: 14px; }
+.theme-btn .i-sun { display: none; }
+.is-dark .theme-btn .i-sun { display: block; }
+.is-dark .theme-btn .i-moon { display: none; }
 @keyframes rot { to { transform: rotate(360deg); } }
 
 /* Controls */
@@ -244,6 +253,10 @@ svg .hit:hover, svg .hit.on { fill: var(--hover); }
         <span>Next in <b class="num" id="countdown">60:00</b></span>
         <button class="refresh" id="refreshBtn" type="button" title="Refresh now">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2.5v3h-3"/></svg>Refresh
+        </button>
+        <button class="refresh theme-btn" id="themeBtn" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <svg class="i-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.6A5.8 5.8 0 0 1 6.4 2.5a5.8 5.8 0 1 0 7.1 7.1z"/></svg>
+          <svg class="i-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.3M8 13.2v1.3M1.5 8h1.3M13.2 8h1.3M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"/></svg>
         </button>
       </div>
     </div>
@@ -616,6 +629,23 @@ svg .hit:hover, svg .hit.on { fill: var(--hover); }
     if (left === 0) refresh();
   }
   btn.addEventListener("click", refresh);
+
+  // ---------- light / dark toggle ----------
+  const root = document.documentElement, themeBtn = $("#themeBtn");
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+  const isDark = () => (root.dataset.theme ? root.dataset.theme === "dark" : systemDark.matches);
+  function syncThemeBtn() {
+    const dark = isDark(), label = dark ? "Switch to light mode" : "Switch to dark mode";
+    root.classList.toggle("is-dark", dark);
+    themeBtn.setAttribute("aria-label", label); themeBtn.title = label;
+  }
+  themeBtn.addEventListener("click", () => {
+    root.dataset.theme = isDark() ? "light" : "dark";
+    try { localStorage.setItem("sfd-theme", root.dataset.theme); } catch (e) {}
+    syncThemeBtn();
+  });
+  systemDark.addEventListener("change", syncThemeBtn);
+  syncThemeBtn();
   document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
 
   build(window.FLOWS);
