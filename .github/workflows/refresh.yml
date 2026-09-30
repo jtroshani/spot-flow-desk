@@ -28,8 +28,8 @@ jobs:
             echo "No new flows."
             exit 0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "Jetmir Troshani"
+          git config user.email "jtroshani@gmail.com"
           git add data.js
           git commit -m "Update flow data $(date -u +'%Y-%m-%d %H:%M UTC')"
           git push
