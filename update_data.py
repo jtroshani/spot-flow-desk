@@ -1,6 +1,6 @@
 """Refresh data.js with daily US spot ETF net flows for BTC, ETH, SOL and XRP.
 
-Source: the per-fund daily history embedded in cryptoetf.today's flow pages.
+Source: cryptoetf.today's per-fund daily history API (AUM from its flow pages).
 Values are US$ millions. Run: python3 update_data.py
 """
 import datetime as dt
@@ -49,23 +49,15 @@ def fetch(slug):
     return urllib.request.urlopen(req, timeout=30).read().decode("utf-8")
 
 
-def history(page):
-    t = page.replace('\\"', '"')
-    start = t.index('"historical":[') + len('"historical":')
-    depth = 0
-    for end in range(start, len(t)):
-        if t[end] == "[":
-            depth += 1
-        elif t[end] == "]":
-            depth -= 1
-            if depth == 0:
-                return json.loads(t[start:end + 1])
-    raise ValueError("historical array not closed")
+def history(slug):
+    req = urllib.request.Request(f"https://api.cryptoetf.today/api/etf-flow/{slug}", headers={"User-Agent": UA})
+    return json.load(urllib.request.urlopen(req, timeout=30))
 
 
 def aum(page):
     text = re.sub(r"<[^>]+>", " ", re.sub(r"<script.*?</script>|<style.*?</style>", "", page, flags=re.S))
-    m = re.search(r"AUM\s+\$([\d.]+)([BM])", text)
+    # The page labelled this "AUM" until Oct 2026, then "Net assets".
+    m = re.search(r"(?:AUM|Net assets)\D{0,40}?\$([\d.]+)([BM])", text)
     return round(float(m.group(1)) * (1000 if m.group(2) == "B" else 1), 1) if m else None
 
 
@@ -87,7 +79,7 @@ def main():
     for sym, (slug, funds) in COINS.items():
         page = fetch(slug)
         rows = []
-        for r in sorted(history(page), key=lambda r: r["date"]):
+        for r in sorted(history(slug), key=lambda r: r["date"]):
             vals = [round(r.get(k) or 0, 3) for k, _, _ in funds]
             total = round(r.get("total") or 0, 3)
             if dt.date.fromisoformat(r["date"]).weekday() >= 5:
