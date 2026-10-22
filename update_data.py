@@ -4,9 +4,13 @@ Source: cryptoetf.today's per-fund daily history API (AUM from its flow pages).
 Values are US$ millions. Run: python3 update_data.py
 """
 import datetime as dt
+import http.client
 import os
 import json
 import re
+import sys
+import time
+import urllib.error
 import urllib.request
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/128 Safari/537.36"
@@ -44,14 +48,33 @@ COINS = {
 }
 
 
+class SourceDown(Exception):
+    """cryptoetf.today kept failing with errors that usually clear up on their own."""
+
+
+def get(url):
+    # The source has short outages (502s, connections cut mid-download); retry
+    # those, and report anything else (e.g. a page layout change) as an error.
+    for attempt in range(4):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            return urllib.request.urlopen(req, timeout=30).read().decode("utf-8")
+        except urllib.error.HTTPError as e:
+            if e.code < 500 and e.code != 429:
+                raise
+            err = e
+        except (urllib.error.URLError, http.client.IncompleteRead, TimeoutError, ConnectionError) as e:
+            err = e
+        time.sleep(15 * (attempt + 1))
+    raise SourceDown(f"{url}: {err}")
+
+
 def fetch(slug):
-    req = urllib.request.Request(f"https://cryptoetf.today/en/{slug}-etf-flows", headers={"User-Agent": UA})
-    return urllib.request.urlopen(req, timeout=30).read().decode("utf-8")
+    return get(f"https://cryptoetf.today/en/{slug}-etf-flows")
 
 
 def history(slug):
-    req = urllib.request.Request(f"https://api.cryptoetf.today/api/etf-flow/{slug}", headers={"User-Agent": UA})
-    return json.load(urllib.request.urlopen(req, timeout=30))
+    return json.loads(get(f"https://api.cryptoetf.today/api/etf-flow/{slug}"))
 
 
 def aum(page):
@@ -113,4 +136,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SourceDown as e:
+        # Keep the current data.js; the next scheduled run will catch up.
+        print(f"::warning::Source unavailable, skipping this refresh: {e}")
+        sys.exit(0)
